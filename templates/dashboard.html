@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artwork Analytics Dashboard</title>
+    <title>Gallery Analytics Dashboard</title>
     <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -11,7 +11,7 @@
     <div class="container-fluid">
         <div class="row my-4">
             <div class="col-12">
-                <h1 class="mb-4">Artwork Analytics Dashboard</h1>
+                <h1 class="mb-4">Gallery Analytics Dashboard</h1>
             </div>
         </div>
 
@@ -20,16 +20,16 @@
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Total Visitors</h5>
-                        <h2 class="card-text">1,234</h2>
+                        <h5 class="card-title">Total Visitors Today</h5>
+                        <h2 class="card-text" id="totalVisitors">-</h2>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Active Now</h5>
-                        <h2 class="card-text">42</h2>
+                        <h5 class="card-title">Active Cameras</h5>
+                        <h2 class="card-text" id="activeCameras">-</h2>
                     </div>
                 </div>
             </div>
@@ -37,15 +37,15 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Avg. Time Spent</h5>
-                        <h2 class="card-text">5.2 min</h2>
+                        <h2 class="card-text" id="avgTimeSpent">-</h2>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Popular Section</h5>
-                        <h2 class="card-text">Section 2</h2>
+                        <h5 class="card-title">Most Viewed Artwork</h5>
+                        <h2 class="card-text" id="popularArtwork">-</h2>
                     </div>
                 </div>
             </div>
@@ -87,28 +87,15 @@
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>ArUco ID</th>
+                                        <th>Visitor ID</th>
                                         <th>Artwork</th>
                                         <th>Time Spent</th>
-                                        <th>Sections Visited</th>
+                                        <th>Sections</th>
                                         <th>Timestamp</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>1234</td>
-                                        <td>Artwork A</td>
-                                        <td>3.5 min</td>
-                                        <td>1, 2, 3</td>
-                                        <td>2024-02-12 14:30</td>
-                                    </tr>
-                                    <tr>
-                                        <td>5678</td>
-                                        <td>Artwork B</td>
-                                        <td>2.1 min</td>
-                                        <td>2, 3</td>
-                                        <td>2024-02-12 14:25</td>
-                                    </tr>
+                                <tbody id="recentObservations">
+                                    <!-- Will be populated by JavaScript -->
                                 </tbody>
                             </table>
                         </div>

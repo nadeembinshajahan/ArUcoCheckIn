@@ -1,10 +1,11 @@
 import os
 import logging
 import time
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import DeclarativeBase
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -27,13 +28,13 @@ def create_app():
     # Initialize database with app
     db.init_app(app)
 
-    from models import CheckIn
-    from camera import Camera
+    from models import CheckIn, Camera as DBCamera, ArtworkObservation  # Renamed to avoid conflict
+    from camera import Camera as VideoCamera  # Renamed to avoid conflict
     from aruco_processor import ArucoProcessor
 
     # Get video source from environment variable, default to camera index 0
     video_source = os.environ.get('VIDEO_SOURCE', 'attached_assets/check.MOV')
-    camera = Camera(video_source)
+    camera = VideoCamera(video_source)
     processor = ArucoProcessor()
 
     def gen_frames():
@@ -144,32 +145,89 @@ def create_app():
             logging.error(f"Error getting history: {str(e)}")
             return jsonify([])
 
+
+    @app.route('/api/camera/register', methods=['POST'])
+    def register_camera():
+        """Register a new camera/RPI in the system"""
+        try:
+            data = request.json
+            camera = DBCamera(
+                camera_id=data['camera_id'],
+                location=data.get('location', 'Unknown'),
+                artwork_ids=json.dumps(data['artwork_ids'])
+            )
+            camera.last_active = datetime.utcnow()
+            db.session.merge(camera)  # Update if exists, insert if new
+            db.session.commit()
+            return jsonify({'success': True})
+        except Exception as e:
+            logging.error(f"Error registering camera: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/observation/update', methods=['POST'])
+    def update_observation():
+        """Update observation times from a camera"""
+        try:
+            data = request.json
+            observation = ArtworkObservation(
+                camera_id=data['camera_id'],
+                artwork_id=data['artwork_id'],
+                aruco_id=data['aruco_id'],
+                start_time=datetime.fromisoformat(data['start_time']),
+                end_time=datetime.fromisoformat(data['end_time']),
+                section_1_time=data['section_times'].get(1, 0),
+                section_2_time=data['section_times'].get(2, 0),
+                section_3_time=data['section_times'].get(3, 0),
+                total_time=sum(data['section_times'].values())
+            )
+            db.session.add(observation)
+            db.session.commit()
+            return jsonify({'success': True})
+        except Exception as e:
+            logging.error(f"Error updating observation: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     @app.route('/api/analytics')
     def get_analytics():
         try:
-            # For now, return mock data
-            # This will be replaced with actual database queries
+            # Get active cameras (active in last 5 minutes)
+            active_time = datetime.utcnow() - timedelta(minutes=5)
+            active_cameras = DBCamera.query.filter(DBCamera.last_active >= active_time).count()
+
+            # Get total unique visitors today
+            today = datetime.utcnow().date()
+            total_visitors = db.session.query(db.func.count(db.distinct(ArtworkObservation.aruco_id)))\
+                .filter(db.func.date(ArtworkObservation.start_time) == today).scalar()
+
+            # Get average time spent per artwork
+            avg_time = db.session.query(db.func.avg(ArtworkObservation.total_time))\
+                .scalar() or 0
+
+            # Get most visited artwork
+            popular_artwork = db.session.query(
+                ArtworkObservation.artwork_id,
+                db.func.count(ArtworkObservation.id).label('visit_count')
+            ).group_by(ArtworkObservation.artwork_id)\
+            .order_by(db.text('visit_count DESC')).first()
+
+            # Get recent observations
+            recent = ArtworkObservation.query\
+                .order_by(ArtworkObservation.start_time.desc())\
+                .limit(10)\
+                .all()
+
             analytics = {
-                'total_visitors': 1234,
-                'active_now': 42,
-                'avg_time': 5.2,
-                'popular_section': 'Section 2',
-                'recent_observations': [
-                    {
-                        'aruco_id': '1234',
-                        'artwork_id': 'Artwork A',
-                        'time_spent': '3.5 min',
-                        'sections': '1, 2, 3',
-                        'timestamp': '2024-02-12 14:30'
-                    },
-                    {
-                        'aruco_id': '5678',
-                        'artwork_id': 'Artwork B',
-                        'time_spent': '2.1 min',
-                        'sections': '2, 3',
-                        'timestamp': '2024-02-12 14:25'
-                    }
-                ]
+                'total_visitors': total_visitors,
+                'active_cameras': active_cameras,
+                'avg_time': round(avg_time / 60, 1),  # Convert to minutes
+                'popular_artwork': popular_artwork[0] if popular_artwork else None,
+                'recent_observations': [{
+                    'aruco_id': str(obs.aruco_id),
+                    'artwork_id': obs.artwork_id,
+                    'time_spent': f"{obs.total_time/60:.1f} min",
+                    'sections': ', '.join(str(i) for i, t in obs.section_times.items() if t > 0),
+                    'timestamp': obs.start_time.strftime('%Y-%m-%d %H:%M')
+                } for obs in recent]
             }
             return jsonify(analytics)
         except Exception as e:

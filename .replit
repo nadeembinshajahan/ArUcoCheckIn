@@ -23,6 +23,10 @@ args = "flask_app"
 task = "workflow.run"
 args = "tracking_test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test_integration"
+
 [[workflows.workflow]]
 name = "flask_app"
 author = "agent"
@@ -51,6 +55,20 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python test_tracking.py"
+
+[[workflows.workflow]]
+name = "test_integration"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python test_server_integration.py"
 
 [[ports]]
 localPort = 5000

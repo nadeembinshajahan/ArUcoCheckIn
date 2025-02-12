@@ -1,5 +1,6 @@
 from app import db
 from datetime import datetime
+import json
 
 class CheckIn(db.Model):
     __tablename__ = 'check_in'
@@ -21,3 +22,50 @@ class CheckIn(db.Model):
     @classmethod
     def get_latest_by_aruco(cls, aruco_id):
         return cls.query.filter_by(aruco_id=aruco_id).order_by(cls.check_in_time.desc()).first()
+
+class ArtworkObservation(db.Model):
+    __tablename__ = 'artwork_observations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    camera_id = db.Column(db.String(50), nullable=False)  # Identifies which RPI camera
+    artwork_id = db.Column(db.String(50), nullable=False)  # Identifies the artwork being observed
+    aruco_id = db.Column(db.Integer, nullable=False)      # Visitor identifier
+    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime)
+    section_1_time = db.Column(db.Float, default=0.0)    # Time spent in section 1
+    section_2_time = db.Column(db.Float, default=0.0)    # Time spent in section 2
+    section_3_time = db.Column(db.Float, default=0.0)    # Time spent in section 3
+    total_time = db.Column(db.Float, default=0.0)        # Total observation time
+
+    @property
+    def section_times(self):
+        return {
+            1: self.section_1_time,
+            2: self.section_2_time,
+            3: self.section_3_time
+        }
+
+class Camera(db.Model):
+    __tablename__ = 'cameras'
+
+    camera_id = db.Column(db.String(50), primary_key=True)  # Changed from 'id' to 'camera_id'
+    location = db.Column(db.String(100))                    # Physical location in gallery
+    artwork_ids = db.Column(db.String(500))                # JSON string of artwork IDs being monitored
+    last_active = db.Column(db.DateTime)                   # Last heartbeat time
+
+    @property
+    def monitored_artworks(self):
+        return json.loads(self.artwork_ids)
+
+    @monitored_artworks.setter
+    def monitored_artworks(self, artwork_list):
+        self.artwork_ids = json.dumps(artwork_list)
+
+class Artwork(db.Model):
+    __tablename__ = 'artworks'
+
+    id = db.Column(db.String(50), primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    artist = db.Column(db.String(200))
+    description = db.Column(db.Text)
+    location = db.Column(db.String(100))  # Location in gallery
