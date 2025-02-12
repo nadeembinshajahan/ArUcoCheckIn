@@ -16,13 +16,9 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_123")
 
-    # Configure PostgreSQL database
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+    # Configure SQLite database
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///aruco_checkin.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,
-        'pool_recycle': 300,
-    }
 
     # Initialize database with app
     db.init_app(app)
