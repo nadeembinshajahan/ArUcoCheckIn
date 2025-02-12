@@ -7,62 +7,77 @@ from datetime import datetime
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Initialize Flask app
-app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_123")
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///checkins.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 # Initialize database
-db = SQLAlchemy(app)
+db = SQLAlchemy()
 
-from models import CheckIn
-from camera import Camera
-from aruco_processor import ArucoProcessor
+# Initialize Flask app
+def create_app():
+    app = Flask(__name__)
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_123")
 
-camera = Camera()
-processor = ArucoProcessor()
+    # Configure PostgreSQL database
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+    # Initialize database with app
+    db.init_app(app)
 
-def gen_frames():
-    while True:
-        frame = camera.get_frame()
+    from models import CheckIn
+    from camera import Camera
+    from aruco_processor import ArucoProcessor
+
+    camera = Camera()
+    processor = ArucoProcessor()
+
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+    def gen_frames():
+        while True:
+            frame = camera.get_frame()
+            if frame is not None:
+                processed_frame, aruco_detected = processor.process_frame(frame)
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + processed_frame + b'\r\n')
+
+    @app.route('/video_feed')
+    def video_feed():
+        return Response(gen_frames(),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+
+    @app.route('/check_aruco')
+    def check_aruco():
+        frame = camera.get_frame(raw=True)
         if frame is not None:
-            processed_frame, aruco_detected = processor.process_frame(frame)
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + processed_frame + b'\r\n')
+            is_detected = processor.check_aruco_in_center(frame)
+            return jsonify({'detected': is_detected})
+        return jsonify({'detected': False})
 
-@app.route('/video_feed')
-def video_feed():
-    return Response(gen_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    @app.route('/checkin/<aruco_id>')
+    def checkin(aruco_id):
+        new_checkin = CheckIn(aruco_id=aruco_id)
+        db.session.add(new_checkin)
+        db.session.commit()
+        return jsonify({'success': True, 'timestamp': new_checkin.timestamp.isoformat()})
 
-@app.route('/check_aruco')
-def check_aruco():
-    frame = camera.get_frame(raw=True)
-    if frame is not None:
-        is_detected = processor.check_aruco_in_center(frame)
-        return jsonify({'detected': is_detected})
-    return jsonify({'detected': False})
+    @app.route('/get_history')
+    def get_history():
+        checkins = CheckIn.query.order_by(CheckIn.timestamp.desc()).limit(10).all()
+        history = [{
+            'aruco_id': c.aruco_id,
+            'timestamp': c.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        } for c in checkins]
+        return jsonify(history)
 
-@app.route('/checkin/<aruco_id>')
-def checkin(aruco_id):
-    new_checkin = CheckIn(aruco_id=aruco_id)
-    db.session.add(new_checkin)
-    db.session.commit()
-    return jsonify({'success': True, 'timestamp': new_checkin.timestamp.isoformat()})
+    with app.app_context():
+        db.create_all()
 
-@app.route('/get_history')
-def get_history():
-    checkins = CheckIn.query.order_by(CheckIn.timestamp.desc()).limit(10).all()
-    history = [{
-        'aruco_id': c.aruco_id,
-        'timestamp': c.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    } for c in checkins]
-    return jsonify(history)
+    return app
 
-with app.app_context():
-    db.create_all()
+# Create the application instance
+app = create_app()
