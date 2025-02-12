@@ -3,7 +3,7 @@ import logging
 import time
 from flask import Flask, render_template, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -57,7 +57,6 @@ def create_app():
                                    b'Content-Type: image/jpeg\r\n\r\n' + processed_frame + b'\r\n')
                 except Exception as e:
                     logging.error(f"Error in video feed: {str(e)}")
-                    # Small delay to prevent rapid reconnection attempts
                     time.sleep(0.1)
 
         return Response(generate(),
@@ -69,25 +68,81 @@ def create_app():
             frame = camera.get_frame(raw=True)
             if frame is not None:
                 detected_id = processor.check_aruco_in_center(frame)
-                return jsonify({'detected': detected_id is not None, 'aruco_id': detected_id})
+                if detected_id:
+                    # Check if there's an active check-in for this ArUco
+                    last_checkin = CheckIn.query.filter_by(
+                        aruco_id=detected_id,
+                        is_checked_out=False
+                    ).first()
+
+                    if last_checkin:
+                        # If checked in more than 10 seconds ago, allow check-out
+                        if datetime.utcnow() - last_checkin.check_in_time > timedelta(seconds=10):
+                            return jsonify({
+                                'detected': True,
+                                'aruco_id': detected_id,
+                                'status': 'can_checkout',
+                                'checkin_id': last_checkin.id
+                            })
+                        return jsonify({
+                            'detected': True,
+                            'aruco_id': detected_id,
+                            'status': 'already_checked_in'
+                        })
+                    return jsonify({
+                        'detected': True,
+                        'aruco_id': detected_id,
+                        'status': 'can_checkin'
+                    })
+
+            return jsonify({'detected': False, 'aruco_id': None, 'status': None})
         except Exception as e:
             logging.error(f"Error checking ArUco: {str(e)}")
-        return jsonify({'detected': False, 'aruco_id': None})
+            return jsonify({'detected': False, 'aruco_id': None, 'status': None})
 
     @app.route('/checkin/<aruco_id>')
     def checkin(aruco_id):
+        # Check if already checked in
+        existing_checkin = CheckIn.query.filter_by(
+            aruco_id=aruco_id,
+            is_checked_out=False
+        ).first()
+
+        if existing_checkin:
+            return jsonify({
+                'success': False,
+                'message': 'Already checked in'
+            })
+
         new_checkin = CheckIn(aruco_id=aruco_id)
         db.session.add(new_checkin)
         db.session.commit()
-        return jsonify({'success': True, 'timestamp': new_checkin.timestamp.isoformat()})
+        return jsonify({
+            'success': True,
+            'message': 'Checked in successfully',
+            'timestamp': new_checkin.check_in_time.isoformat()
+        })
+
+    @app.route('/checkout/<int:checkin_id>')
+    def checkout(checkin_id):
+        checkin = CheckIn.query.get(checkin_id)
+        if checkin and not checkin.is_checked_out:
+            checkin.check_out_time = datetime.utcnow()
+            checkin.is_checked_out = True
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Checked out successfully'
+            })
+        return jsonify({
+            'success': False,
+            'message': 'Invalid check-in or already checked out'
+        })
 
     @app.route('/get_history')
     def get_history():
-        checkins = CheckIn.query.order_by(CheckIn.timestamp.desc()).limit(10).all()
-        history = [{
-            'aruco_id': c.aruco_id,
-            'timestamp': c.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        } for c in checkins]
+        checkins = CheckIn.query.order_by(CheckIn.check_in_time.desc()).limit(10).all()
+        history = [checkin.to_dict() for checkin in checkins]
         return jsonify(history)
 
     with app.app_context():
