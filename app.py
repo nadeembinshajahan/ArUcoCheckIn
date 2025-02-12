@@ -50,6 +50,10 @@ def create_app():
     def index():
         return render_template('index.html')
 
+    @app.route('/dashboard')
+    def dashboard():
+        return render_template('dashboard.html')
+
     @app.route('/video_feed')
     def video_feed():
         return Response(gen_frames(),
@@ -140,10 +144,40 @@ def create_app():
             logging.error(f"Error getting history: {str(e)}")
             return jsonify([])
 
+    @app.route('/api/analytics')
+    def get_analytics():
+        try:
+            # For now, return mock data
+            # This will be replaced with actual database queries
+            analytics = {
+                'total_visitors': 1234,
+                'active_now': 42,
+                'avg_time': 5.2,
+                'popular_section': 'Section 2',
+                'recent_observations': [
+                    {
+                        'aruco_id': '1234',
+                        'artwork_id': 'Artwork A',
+                        'time_spent': '3.5 min',
+                        'sections': '1, 2, 3',
+                        'timestamp': '2024-02-12 14:30'
+                    },
+                    {
+                        'aruco_id': '5678',
+                        'artwork_id': 'Artwork B',
+                        'time_spent': '2.1 min',
+                        'sections': '2, 3',
+                        'timestamp': '2024-02-12 14:25'
+                    }
+                ]
+            }
+            return jsonify(analytics)
+        except Exception as e:
+            logging.error(f"Error fetching analytics: {str(e)}")
+            return jsonify({'error': 'Failed to fetch analytics data'}), 500
+
     # Create database tables
     with app.app_context():
-        # Drop all tables and recreate them
-        db.drop_all()
         db.create_all()
         logging.info("Database tables created successfully")
 
