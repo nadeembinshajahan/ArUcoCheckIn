@@ -3,42 +3,48 @@ function updateDashboard() {
     fetch('/api/analytics')
         .then(response => response.json())
         .then(data => {
-            // Update statistics cards
-            document.querySelector('#totalVisitors').textContent = data.total_visitors;
-            document.querySelector('#activeCameras').textContent = data.active_cameras;
-            document.querySelector('#avgTimeSpent').textContent = `${data.avg_time} min`;
+            // Update statistics cards with fallback values
+            document.querySelector('#totalVisitors').textContent = data.total_visitors || '0';
+            document.querySelector('#activeCameras').textContent = data.active_cameras || '0';
+            document.querySelector('#avgTimeSpent').textContent = `${data.avg_time || '0'} min`;
             document.querySelector('#popularArtwork').textContent = data.popular_artwork || 'N/A';
 
             // Update recent observations table
-            const tbody = document.querySelector('#recentObservations tbody');
-            tbody.innerHTML = data.recent_observations.map(obs => `
-                <tr>
-                    <td>${obs.aruco_id}</td>
-                    <td>${obs.artwork_id}</td>
-                    <td>${obs.time_spent}</td>
-                    <td>${obs.sections}</td>
-                    <td>${obs.timestamp}</td>
-                </tr>
-            `).join('');
+            const tbody = document.querySelector('#recentObservations');
+            if (data.recent_observations && data.recent_observations.length > 0) {
+                tbody.innerHTML = data.recent_observations.map(obs => `
+                    <tr>
+                        <td>${obs.aruco_id || 'Unknown'}</td>
+                        <td>${obs.artwork_id || 'Unknown'}</td>
+                        <td>${obs.time_spent || '0 min'}</td>
+                        <td>${obs.sections || 'None'}</td>
+                        <td>${obs.timestamp || 'N/A'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No recent observations</td></tr>';
+            }
 
             // Update time per section chart
             if (window.timeChart) {
-                // Calculate average time per section across all observations
-                const sectionTimes = data.recent_observations.reduce((acc, obs) => {
-                    const sections = obs.sections.split(', ').map(Number);
-                    sections.forEach(section => {
-                        acc[section - 1] = (acc[section - 1] || 0) + parseFloat(obs.time_spent);
-                    });
-                    return acc;
-                }, [0, 0, 0]).map(time => time / data.recent_observations.length);
+                const sectionTimes = data.recent_observations && data.recent_observations.length > 0
+                    ? data.recent_observations.reduce((acc, obs) => {
+                        const sections = (obs.sections || '').split(', ').map(Number);
+                        sections.forEach(section => {
+                            if (!isNaN(section)) {
+                                acc[section - 1] = (acc[section - 1] || 0) + parseFloat(obs.time_spent || 0);
+                            }
+                        });
+                        return acc;
+                    }, [0, 0, 0]).map(time => time / (data.recent_observations.length || 1))
+                    : [0, 0, 0];
 
                 window.timeChart.data.datasets[0].data = sectionTimes;
                 window.timeChart.update();
             }
 
-            // Update visitor flow chart if exists
+            // Update visitor flow chart
             if (window.flowChart) {
-                // Get hourly visitor counts
                 const hours = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM'];
                 const visitorCounts = hours.map(() => Math.floor(Math.random() * 50 + 10)); // Mock data for now
 
@@ -46,7 +52,17 @@ function updateDashboard() {
                 window.flowChart.update();
             }
         })
-        .catch(error => console.error('Error updating dashboard:', error));
+        .catch(error => {
+            console.error('Error updating dashboard:', error);
+            // Handle error state in UI
+            document.querySelector('#totalVisitors').textContent = '0';
+            document.querySelector('#activeCameras').textContent = '0';
+            document.querySelector('#avgTimeSpent').textContent = '0 min';
+            document.querySelector('#popularArtwork').textContent = 'N/A';
+
+            const tbody = document.querySelector('#recentObservations');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Failed to load data</td></tr>';
+        });
 }
 
 // Initialize charts when the page loads

@@ -2,6 +2,16 @@ from app import db
 from datetime import datetime
 import json
 
+class ObservationEvent(db.Model):
+    __tablename__ = 'observation_events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    camera_id = db.Column(db.String(50), nullable=False)
+    artwork_id = db.Column(db.String(50), nullable=False)
+    aruco_id = db.Column(db.Integer, nullable=False)
+    event_type = db.Column(db.String(20), nullable=False)  # 'start' or 'update'
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
 class CheckIn(db.Model):
     __tablename__ = 'check_in'
 
@@ -30,8 +40,7 @@ class ArtworkObservation(db.Model):
     camera_id = db.Column(db.String(50), nullable=False)  # Identifies which RPI camera
     artwork_id = db.Column(db.String(50), nullable=False)  # Identifies the artwork being observed
     aruco_id = db.Column(db.Integer, nullable=False)      # Visitor identifier
-    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    end_time = db.Column(db.DateTime)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # Changed from start_time to timestamp
     section_1_time = db.Column(db.Float, default=0.0)    # Time spent in section 1
     section_2_time = db.Column(db.Float, default=0.0)    # Time spent in section 2
     section_3_time = db.Column(db.Float, default=0.0)    # Time spent in section 3
