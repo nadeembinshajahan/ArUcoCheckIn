@@ -19,15 +19,14 @@ class CheckIn(db.Model):
     aruco_id = db.Column(db.String(50), nullable=False)
     check_in_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     check_out_time = db.Column(db.DateTime, nullable=True)
-    status = db.Column(db.String(20), nullable=False, default='checked_in')  # 'checked_in' or 'checked_out'
+    status = db.Column(db.String(20), nullable=False, default='checked_in')
 
     @property
     def can_check_in(self):
-        """Check if the ArUco code can check in again"""
         if not self.check_out_time:
             return False
         time_diff = datetime.utcnow() - self.check_out_time
-        return time_diff.total_seconds() >= 10  # 10-second cooldown
+        return time_diff.total_seconds() >= 10
 
     @classmethod
     def get_latest_by_aruco(cls, aruco_id):
@@ -40,7 +39,8 @@ class ArtworkObservation(db.Model):
     camera_id = db.Column(db.String(50), nullable=False)
     artwork_id = db.Column(db.String(50), nullable=False)
     aruco_id = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime, nullable=True)
     section_1_time = db.Column(db.Float, default=0.0)
     section_2_time = db.Column(db.Float, default=0.0)
     section_3_time = db.Column(db.Float, default=0.0)
@@ -77,4 +77,4 @@ class Artwork(db.Model):
     name = db.Column(db.String(200), nullable=False)
     artist = db.Column(db.String(200))
     description = db.Column(db.Text)
-    location = db.Column(db.String(100))  # Location in gallery
+    location = db.Column(db.String(100))
