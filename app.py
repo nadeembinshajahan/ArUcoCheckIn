@@ -168,7 +168,7 @@ def create_app():
             logging.error(f"Error registering camera: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/observation/start', methods=['POST']) # Added route for observation start
+    @app.route('/api/observation/start', methods=['POST'])  # Changed from /observation/start
     def start_observation():
         try:
             data = request.json
@@ -183,9 +183,10 @@ def create_app():
             db.session.commit()
             return jsonify({'success': True})
         except Exception as e:
+            logging.error(f"Error starting observation: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/observation/update', methods=['POST']) # Modified route for observation update
+    @app.route('/api/observation/update', methods=['POST'])  # Changed from /observation/update
     def update_observation():
         try:
             data = request.json
@@ -193,7 +194,7 @@ def create_app():
                 camera_id=data['camera_id'],
                 artwork_id=data['artwork_id'],
                 aruco_id=data['aruco_id'],
-                start_time=datetime.fromisoformat(data['timestamp']), #changed to start_time
+                timestamp=datetime.fromisoformat(data['timestamp']),
                 section_1_time=data['section_times'][1],
                 section_2_time=data['section_times'][2],
                 section_3_time=data['section_times'][3],
@@ -203,6 +204,7 @@ def create_app():
             db.session.commit()
             return jsonify({'success': True})
         except Exception as e:
+            logging.error(f"Error updating observation: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/analytics')
