@@ -4,12 +4,16 @@ import time
 from flask import Flask, render_template, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from sqlalchemy.orm import DeclarativeBase
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Initialize database
-db = SQLAlchemy()
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
 
 # Initialize Flask app
 def create_app():
@@ -46,22 +50,8 @@ def create_app():
 
     @app.route('/video_feed')
     def video_feed():
-        def generate():
-            while True:
-                try:
-                    frame = camera.get_frame()
-                    if frame is not None:
-                        processed_frame, aruco_detected = processor.process_frame(frame)
-                        if processed_frame is not None:
-                            yield (b'--frame\r\n'
-                                   b'Content-Type: image/jpeg\r\n\r\n' + processed_frame + b'\r\n')
-                except Exception as e:
-                    logging.error(f"Error in video feed: {str(e)}")
-                    # Small delay to prevent rapid reconnection attempts
-                    time.sleep(0.1)
-
-        return Response(generate(),
-                        mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(gen_frames(),
+                       mimetype='multipart/x-mixed-replace; boundary=frame')
 
     @app.route('/check_aruco')
     def check_aruco():
@@ -69,29 +59,76 @@ def create_app():
             frame = camera.get_frame(raw=True)
             if frame is not None:
                 detected_id = processor.check_aruco_in_center(frame)
-                return jsonify({'detected': detected_id is not None, 'aruco_id': detected_id})
+                if detected_id:
+                    latest_checkin = CheckIn.get_latest_by_aruco(detected_id)
+                    if latest_checkin:
+                        if latest_checkin.status == 'checked_in':
+                            return jsonify({
+                                'detected': True,
+                                'aruco_id': detected_id,
+                                'status': 'can_checkout'
+                            })
+                        elif latest_checkin.can_check_in:
+                            return jsonify({
+                                'detected': True,
+                                'aruco_id': detected_id,
+                                'status': 'can_checkin'
+                            })
+                        else:
+                            return jsonify({
+                                'detected': True,
+                                'aruco_id': detected_id,
+                                'status': 'cooldown'
+                            })
+                    else:
+                        return jsonify({
+                            'detected': True,
+                            'aruco_id': detected_id,
+                            'status': 'can_checkin'
+                        })
         except Exception as e:
             logging.error(f"Error checking ArUco: {str(e)}")
-        return jsonify({'detected': False, 'aruco_id': None})
+        return jsonify({'detected': False, 'aruco_id': None, 'status': None})
 
     @app.route('/checkin/<aruco_id>')
     def checkin(aruco_id):
+        latest_checkin = CheckIn.get_latest_by_aruco(aruco_id)
+        if latest_checkin and latest_checkin.status == 'checked_in':
+            return jsonify({'success': False, 'error': 'Already checked in'})
+
+        if latest_checkin and not latest_checkin.can_check_in:
+            return jsonify({'success': False, 'error': 'Please wait before checking in again'})
+
         new_checkin = CheckIn(aruco_id=aruco_id)
         db.session.add(new_checkin)
         db.session.commit()
-        return jsonify({'success': True, 'timestamp': new_checkin.timestamp.isoformat()})
+        return jsonify({'success': True, 'timestamp': new_checkin.check_in_time.isoformat()})
+
+    @app.route('/checkout/<aruco_id>')
+    def checkout(aruco_id):
+        checkin = CheckIn.get_latest_by_aruco(aruco_id)
+        if not checkin or checkin.status != 'checked_in':
+            return jsonify({'success': False, 'error': 'No active check-in found'})
+
+        checkin.status = 'checked_out'
+        checkin.check_out_time = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'success': True, 'timestamp': checkin.check_out_time.isoformat()})
 
     @app.route('/get_history')
     def get_history():
-        checkins = CheckIn.query.order_by(CheckIn.timestamp.desc()).limit(10).all()
+        checkins = CheckIn.query.order_by(CheckIn.check_in_time.desc()).limit(10).all()
         history = [{
             'aruco_id': c.aruco_id,
-            'timestamp': c.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            'timestamp': c.check_in_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'status': c.status,
+            'checkout_time': c.check_out_time.strftime('%Y-%m-%d %H:%M:%S') if c.check_out_time else None
         } for c in checkins]
         return jsonify(history)
 
     with app.app_context():
         db.create_all()
+        logging.info("Database tables created successfully")
 
     return app
 
