@@ -265,6 +265,38 @@ def create_app():
             logging.error(f"Error fetching analytics: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/camera_config')
+    def camera_config():
+        return render_template('camera_config.html')
+
+    @app.route('/api/connect_camera', methods=['POST'])
+    def connect_camera():
+        try:
+            data = request.json
+            camera_url = data.get('camera_url')
+
+            # Validate camera URL
+            # For now, just return success. In production, you'd verify the camera is accessible
+            return jsonify({'success': True})
+        except Exception as e:
+            logging.error(f"Error connecting to camera: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/save_regions', methods=['POST'])
+    def save_regions():
+        try:
+            data = request.json
+            camera_url = data.get('camera_url')
+            regions = data.get('regions', [])
+
+            # Save regions to database
+            # TODO: Implement database storage for regions
+
+            return jsonify({'success': True})
+        except Exception as e:
+            logging.error(f"Error saving regions: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     # Create database tables
     with app.app_context():
         db.create_all()

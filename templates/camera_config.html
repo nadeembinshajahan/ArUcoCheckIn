@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Configuration</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <style>
+        .canvas-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        #videoCanvas {
+            border: 2px solid #666;
+        }
+        #drawCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Camera Configuration</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Camera Settings</h5>
+                        <form id="cameraForm">
+                            <div class="mb-3">
+                                <label for="cameraUrl" class="form-label">Camera URL/Source</label>
+                                <input type="text" class="form-control" id="cameraUrl" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Connect Camera</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Drawing Tools</h5>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary" id="startDrawing">Draw Region</button>
+                            <button type="button" class="btn btn-outline-danger" id="clearDrawing">Clear</button>
+                            <button type="button" class="btn btn-success" id="saveRegions">Save Regions</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="videoCanvas"></canvas>
+            <canvas id="drawCanvas"></canvas>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Defined Regions</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Region ID</th>
+                                <th>Artwork Name</th>
+                                <th>Coordinates</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="regionsTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/camera_config.js"></script>
+</body>
+</html>
