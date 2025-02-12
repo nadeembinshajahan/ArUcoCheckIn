@@ -32,7 +32,7 @@ def create_app():
     # Initialize database with app
     db.init_app(app)
 
-    from models import CheckIn, Camera as DBCamera, ArtworkObservation, ObservationEvent # Added import for ObservationEvent
+    from models import CheckIn, Camera as DBCamera, ArtworkObservation, ObservationEvent
     from camera import Camera as VideoCamera
     from aruco_processor import ArucoProcessor
 
@@ -193,7 +193,7 @@ def create_app():
                 camera_id=data['camera_id'],
                 artwork_id=data['artwork_id'],
                 aruco_id=data['aruco_id'],
-                timestamp=datetime.fromisoformat(data['timestamp']),
+                start_time=datetime.fromisoformat(data['timestamp']), #changed to start_time
                 section_1_time=data['section_times'][1],
                 section_2_time=data['section_times'][2],
                 section_3_time=data['section_times'][3],
@@ -215,11 +215,11 @@ def create_app():
             # Get total unique visitors today
             today = datetime.utcnow().date()
             total_visitors = db.session.query(db.func.count(db.distinct(ArtworkObservation.aruco_id)))\
-                .filter(db.func.date(ArtworkObservation.timestamp) == today).scalar()
+                .filter(db.func.date(ArtworkObservation.start_time) == today).scalar()
 
             # Get average time spent per artwork (in minutes)
             avg_time = db.session.query(db.func.avg(ArtworkObservation.total_time))\
-                .filter(db.func.date(ArtworkObservation.timestamp) == today)\
+                .filter(db.func.date(ArtworkObservation.start_time) == today)\
                 .scalar() or 0
 
             # Get most popular artwork
@@ -234,11 +234,11 @@ def create_app():
                 db.func.avg(ArtworkObservation.section_1_time).label('section_1'),
                 db.func.avg(ArtworkObservation.section_2_time).label('section_2'),
                 db.func.avg(ArtworkObservation.section_3_time).label('section_3')
-            ).filter(db.func.date(ArtworkObservation.timestamp) == today).first()
+            ).filter(db.func.date(ArtworkObservation.start_time) == today).first()
 
             # Get recent observations
             recent = ArtworkObservation.query\
-                .order_by(ArtworkObservation.timestamp.desc())\
+                .order_by(ArtworkObservation.start_time.desc())\
                 .limit(10)\
                 .all()
 
@@ -257,7 +257,7 @@ def create_app():
                     'artwork_id': obs.artwork_id,
                     'time_spent': f"{float(obs.total_time)/60:.1f} min",
                     'sections': ', '.join(str(i) for i, t in obs.section_times.items() if t > 0),
-                    'timestamp': obs.timestamp.strftime('%Y-%m-%d %H:%M')
+                    'timestamp': obs.start_time.strftime('%Y-%m-%d %H:%M')
                 } for obs in recent] if recent else []
             }
             return jsonify(analytics)
