@@ -3,9 +3,7 @@ let drawCanvas = document.getElementById('drawCanvas');
 let videoCtx = videoCanvas.getContext('2d');
 let drawCtx = drawCanvas.getContext('2d');
 
-let isDrawing = false;
-let currentPath = [];
-let savedRegions = [];
+let verticalLines = [];  // Store x-coordinates of vertical lines
 let streamUrl = null;
 
 // Set canvas size
@@ -13,80 +11,73 @@ function setCanvasSize() {
     const containerWidth = document.querySelector('.canvas-container').offsetWidth;
     const aspectRatio = 9/16;
     const height = containerWidth * aspectRatio;
-    
+
     videoCanvas.width = drawCanvas.width = containerWidth;
     videoCanvas.height = drawCanvas.height = height;
+
+    // Redraw lines after resize
+    redrawLines();
 }
 
 // Initialize
 setCanvasSize();
 window.addEventListener('resize', setCanvasSize);
 
-// Drawing handlers
-drawCanvas.addEventListener('mousedown', startDraw);
-drawCanvas.addEventListener('mousemove', draw);
-drawCanvas.addEventListener('mouseup', endDraw);
-drawCanvas.addEventListener('mouseout', endDraw);
-
-function startDraw(e) {
+// Drawing handler - now just for vertical lines
+drawCanvas.addEventListener('click', function(e) {
     if (!document.getElementById('startDrawing').classList.contains('active')) return;
-    
-    isDrawing = true;
+
     const rect = drawCanvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    currentPath = [{x, y}];
+
+    // Add line to storage
+    verticalLines.push({
+        x: x,
+        name: `Region ${verticalLines.length + 1}`
+    });
+
+    // Draw the line
+    drawVerticalLine(x);
+    updateRegionsTable();
+});
+
+function drawVerticalLine(x) {
     drawCtx.beginPath();
-    drawCtx.moveTo(x, y);
+    drawCtx.moveTo(x, 0);
+    drawCtx.lineTo(x, drawCanvas.height);
     drawCtx.strokeStyle = '#00ff00';
     drawCtx.lineWidth = 2;
-}
-
-function draw(e) {
-    if (!isDrawing) return;
-    
-    const rect = drawCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    currentPath.push({x, y});
-    drawCtx.lineTo(x, y);
     drawCtx.stroke();
 }
 
-function endDraw() {
-    if (!isDrawing) return;
-    
-    isDrawing = false;
-    if (currentPath.length > 2) {
-        // Close the path
-        drawCtx.lineTo(currentPath[0].x, currentPath[0].y);
-        drawCtx.stroke();
-        drawCtx.closePath();
-        
-        // Add to saved regions
-        savedRegions.push({
-            id: Date.now(),
-            name: `Artwork ${savedRegions.length + 1}`,
-            points: currentPath
-        });
-        
-        updateRegionsTable();
-    }
-    currentPath = [];
+function redrawLines() {
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    verticalLines.forEach(line => {
+        drawVerticalLine(line.x);
+    });
 }
 
 function updateRegionsTable() {
     const tbody = document.getElementById('regionsTable');
-    tbody.innerHTML = savedRegions.map(region => `
+    // Create regions from pairs of lines
+    const regions = [];
+    for (let i = 0; i < verticalLines.length - 1; i++) {
+        regions.push({
+            id: i + 1,
+            name: `Region ${i + 1}`,
+            start: verticalLines[i].x,
+            end: verticalLines[i + 1].x
+        });
+    }
+
+    tbody.innerHTML = regions.map(region => `
         <tr>
             <td>${region.id}</td>
             <td>
                 <input type="text" class="form-control" value="${region.name}"
                     onchange="updateRegionName(${region.id}, this.value)">
             </td>
-            <td>${region.points.length} points</td>
+            <td>X: ${Math.round(region.start)} to ${Math.round(region.end)}</td>
             <td>
                 <button class="btn btn-sm btn-danger" onclick="deleteRegion(${region.id})">Delete</button>
             </td>
@@ -95,33 +86,17 @@ function updateRegionsTable() {
 }
 
 function updateRegionName(id, newName) {
-    const region = savedRegions.find(r => r.id === id);
+    const region = verticalLines[id - 1];
     if (region) {
         region.name = newName;
     }
 }
 
 function deleteRegion(id) {
-    savedRegions = savedRegions.filter(r => r.id !== id);
-    redrawRegions();
+    // Remove the vertical lines that define this region
+    verticalLines.splice(id - 1, 2);
+    redrawLines();
     updateRegionsTable();
-}
-
-function redrawRegions() {
-    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    
-    savedRegions.forEach(region => {
-        drawCtx.beginPath();
-        drawCtx.moveTo(region.points[0].x, region.points[0].y);
-        region.points.forEach(point => {
-            drawCtx.lineTo(point.x, point.y);
-        });
-        drawCtx.lineTo(region.points[0].x, region.points[0].y);
-        drawCtx.strokeStyle = '#00ff00';
-        drawCtx.lineWidth = 2;
-        drawCtx.stroke();
-        drawCtx.closePath();
-    });
 }
 
 // Button handlers
@@ -131,12 +106,25 @@ document.getElementById('startDrawing').addEventListener('click', function(e) {
 
 document.getElementById('clearDrawing').addEventListener('click', function() {
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    savedRegions = [];
+    verticalLines = [];
     updateRegionsTable();
 });
 
 document.getElementById('saveRegions').addEventListener('click', async function() {
     try {
+        // Create regions from pairs of lines
+        const regions = [];
+        for (let i = 0; i < verticalLines.length - 1; i++) {
+            regions.push({
+                id: i + 1,
+                name: verticalLines[i].name,
+                boundaries: {
+                    start: verticalLines[i].x,
+                    end: verticalLines[i + 1].x
+                }
+            });
+        }
+
         const response = await fetch('/api/save_regions', {
             method: 'POST',
             headers: {
@@ -144,10 +132,10 @@ document.getElementById('saveRegions').addEventListener('click', async function(
             },
             body: JSON.stringify({
                 camera_url: streamUrl,
-                regions: savedRegions
+                regions: regions
             })
         });
-        
+
         if (response.ok) {
             alert('Regions saved successfully!');
         } else {
@@ -163,7 +151,7 @@ document.getElementById('saveRegions').addEventListener('click', async function(
 document.getElementById('cameraForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     streamUrl = document.getElementById('cameraUrl').value;
-    
+
     try {
         const response = await fetch('/api/connect_camera', {
             method: 'POST',
@@ -174,7 +162,7 @@ document.getElementById('cameraForm').addEventListener('submit', async function(
                 camera_url: streamUrl
             })
         });
-        
+
         if (response.ok) {
             // Start video stream
             const videoStream = await navigator.mediaDevices.getUserMedia({
@@ -182,11 +170,11 @@ document.getElementById('cameraForm').addEventListener('submit', async function(
                     facingMode: 'environment'
                 }
             });
-            
+
             const video = document.createElement('video');
             video.srcObject = videoStream;
             video.play();
-            
+
             // Update canvas with video feed
             function updateCanvas() {
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
