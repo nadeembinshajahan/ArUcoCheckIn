@@ -215,18 +215,26 @@ def create_app():
             # Get total unique visitors today
             today = datetime.utcnow().date()
             total_visitors = db.session.query(db.func.count(db.distinct(ArtworkObservation.aruco_id)))\
-                .filter(db.func.date(ArtworkObservation.timestamp) == today).scalar() # Changed start_time to timestamp
+                .filter(db.func.date(ArtworkObservation.timestamp) == today).scalar()
 
-            # Get average time spent per artwork
+            # Get average time spent per artwork (in minutes)
             avg_time = db.session.query(db.func.avg(ArtworkObservation.total_time))\
+                .filter(db.func.date(ArtworkObservation.timestamp) == today)\
                 .scalar() or 0
 
-            # Get most visited artwork
+            # Get most popular artwork
             popular_artwork = db.session.query(
                 ArtworkObservation.artwork_id,
                 db.func.count(ArtworkObservation.id).label('visit_count')
             ).group_by(ArtworkObservation.artwork_id)\
             .order_by(db.text('visit_count DESC')).first()
+
+            # Get section time distribution
+            section_times = db.session.query(
+                db.func.avg(ArtworkObservation.section_1_time).label('section_1'),
+                db.func.avg(ArtworkObservation.section_2_time).label('section_2'),
+                db.func.avg(ArtworkObservation.section_3_time).label('section_3')
+            ).filter(db.func.date(ArtworkObservation.timestamp) == today).first()
 
             # Get recent observations
             recent = ArtworkObservation.query\
@@ -237,26 +245,25 @@ def create_app():
             analytics = {
                 'total_visitors': total_visitors or 0,
                 'active_cameras': active_cameras or 0,
-                'avg_time': round((avg_time or 0) / 60, 1),  # Convert to minutes
-                'popular_artwork': popular_artwork[0] if popular_artwork else None,
+                'avg_time': round(float(avg_time) / 60, 1),  # Convert to minutes
+                'popular_artwork': popular_artwork[0] if popular_artwork else "N/A",
+                'section_times': {
+                    'section_1': round(float(section_times[0] or 0) / 60, 1),
+                    'section_2': round(float(section_times[1] or 0) / 60, 1),
+                    'section_3': round(float(section_times[2] or 0) / 60, 1)
+                },
                 'recent_observations': [{
                     'aruco_id': str(obs.aruco_id),
                     'artwork_id': obs.artwork_id,
-                    'time_spent': f"{obs.total_time/60:.1f} min",
+                    'time_spent': f"{float(obs.total_time)/60:.1f} min",
                     'sections': ', '.join(str(i) for i, t in obs.section_times.items() if t > 0),
-                    'timestamp': obs.timestamp.strftime('%Y-%m-%d %H:%M') # Changed start_time to timestamp
+                    'timestamp': obs.timestamp.strftime('%Y-%m-%d %H:%M')
                 } for obs in recent] if recent else []
             }
             return jsonify(analytics)
         except Exception as e:
             logging.error(f"Error fetching analytics: {str(e)}")
-            return jsonify({
-                'total_visitors': 0,
-                'active_cameras': 0,
-                'avg_time': 0,
-                'popular_artwork': None,
-                'recent_observations': []
-            })
+            return jsonify({'error': str(e)}), 500
 
     # Create database tables
     with app.app_context():

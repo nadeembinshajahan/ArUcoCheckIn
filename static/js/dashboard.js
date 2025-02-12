@@ -3,7 +3,12 @@ function updateDashboard() {
     fetch('/api/analytics')
         .then(response => response.json())
         .then(data => {
-            // Update statistics cards with fallback values
+            if (data.error) {
+                console.error('Error from server:', data.error);
+                return;
+            }
+
+            // Update statistics cards
             document.querySelector('#totalVisitors').textContent = data.total_visitors || '0';
             document.querySelector('#activeCameras').textContent = data.active_cameras || '0';
             document.querySelector('#avgTimeSpent').textContent = `${data.avg_time || '0'} min`;
@@ -27,28 +32,26 @@ function updateDashboard() {
 
             // Update time per section chart
             if (window.timeChart) {
-                const sectionTimes = data.recent_observations && data.recent_observations.length > 0
-                    ? data.recent_observations.reduce((acc, obs) => {
-                        const sections = (obs.sections || '').split(', ').map(Number);
-                        sections.forEach(section => {
-                            if (!isNaN(section)) {
-                                acc[section - 1] = (acc[section - 1] || 0) + parseFloat(obs.time_spent || 0);
-                            }
-                        });
-                        return acc;
-                    }, [0, 0, 0]).map(time => time / (data.recent_observations.length || 1))
-                    : [0, 0, 0];
-
+                const sectionTimes = [
+                    data.section_times?.section_1 || 0,
+                    data.section_times?.section_2 || 0,
+                    data.section_times?.section_3 || 0
+                ];
                 window.timeChart.data.datasets[0].data = sectionTimes;
                 window.timeChart.update();
             }
 
-            // Update visitor flow chart
-            if (window.flowChart) {
-                const hours = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM'];
-                const visitorCounts = hours.map(() => Math.floor(Math.random() * 50 + 10)); // Mock data for now
-
-                window.flowChart.data.datasets[0].data = visitorCounts;
+            // Update visitor flow chart with real data if available
+            if (window.flowChart && data.recent_observations) {
+                const hourCounts = new Array(7).fill(0); // 9 AM to 3 PM
+                data.recent_observations.forEach(obs => {
+                    const hour = new Date(obs.timestamp).getHours();
+                    const index = hour - 9; // 9 AM is index 0
+                    if (index >= 0 && index < 7) {
+                        hourCounts[index]++;
+                    }
+                });
+                window.flowChart.data.datasets[0].data = hourCounts;
                 window.flowChart.update();
             }
         })
@@ -132,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Update dashboard every 30 seconds
+    // Update dashboard immediately and then every 30 seconds
     updateDashboard();
     setInterval(updateDashboard, 30000);
 });
