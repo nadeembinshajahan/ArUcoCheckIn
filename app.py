@@ -30,7 +30,9 @@ def create_app():
     from camera import Camera
     from aruco_processor import ArucoProcessor
 
-    camera = Camera()
+    # Get video source from environment variable, default to camera index 0
+    video_source = os.environ.get('VIDEO_SOURCE', '0')
+    camera = Camera(video_source)
     processor = ArucoProcessor()
 
     @app.route('/')
