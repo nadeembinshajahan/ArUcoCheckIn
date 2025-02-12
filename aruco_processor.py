@@ -15,7 +15,7 @@ class ArucoProcessor:
 
         # Draw center box
         height, width = frame.shape[:2]
-        box_size = min(width, height) // 2  # Increased box size to half of min dimension
+        box_size = min(width, height) // 1.5  # Make box bigger - using 2/3 of min dimension
         center_x = width // 2
         center_y = height // 2
 
@@ -25,7 +25,7 @@ class ArucoProcessor:
         # Check if marker is in center box
         aruco_detected = False
         detected_id = None
-        if len(corners) > 0:
+        if ids is not None and len(ids) > 0:
             for i, corner in enumerate(corners):
                 marker_center = np.mean(corner[0], axis=0)
                 if (abs(marker_center[0] - center_x) < box_size//2 and
@@ -41,7 +41,7 @@ class ArucoProcessor:
                      (center_x + box_size//2, center_y + box_size//2),
                      color, 2)
 
-        if len(corners) > 0:
+        if ids is not None:
             cv2.aruco.drawDetectedMarkers(frame, corners, ids)
 
         ret, jpeg = cv2.imencode('.jpg', frame)
@@ -49,14 +49,14 @@ class ArucoProcessor:
 
     def check_aruco_in_center(self, frame):
         height, width = frame.shape[:2]
-        box_size = min(width, height) // 2  # Match the larger box size
+        box_size = min(width, height) // 1.5  # Match the box size from process_frame
         center_x = width // 2
         center_y = height // 2
 
         # Detect ArUco markers
         corners, ids, _ = self.detector.detectMarkers(frame)
 
-        if len(corners) > 0:
+        if ids is not None and len(ids) > 0:
             for i, corner in enumerate(corners):
                 marker_center = np.mean(corner[0], axis=0)
                 if (abs(marker_center[0] - center_x) < box_size//2 and
