@@ -31,7 +31,7 @@ def create_app():
     from aruco_processor import ArucoProcessor
 
     # Get video source from environment variable, default to camera index 0
-    video_source = os.environ.get('VIDEO_SOURCE', '0')
+    video_source = os.environ.get('VIDEO_SOURCE', 'attached_assets/check.MOV')
     camera = Camera(video_source)
     processor = ArucoProcessor()
 
