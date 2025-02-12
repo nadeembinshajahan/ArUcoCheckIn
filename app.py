@@ -72,11 +72,11 @@ def create_app():
         try:
             frame = camera.get_frame(raw=True)
             if frame is not None:
-                is_detected = processor.check_aruco_in_center(frame)
-                return jsonify({'detected': is_detected})
+                detected_id = processor.check_aruco_in_center(frame)
+                return jsonify({'detected': detected_id is not None, 'aruco_id': detected_id})
         except Exception as e:
             logging.error(f"Error checking ArUco: {str(e)}")
-        return jsonify({'detected': False})
+        return jsonify({'detected': False, 'aruco_id': None})
 
     @app.route('/checkin/<aruco_id>')
     def checkin(aruco_id):

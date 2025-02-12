@@ -29,10 +29,10 @@ function checkAruco() {
     fetch('/check_aruco')
         .then(response => response.json())
         .then(data => {
-            if (data.detected) {
-                updateStatus('ArUco code detected! Ready for check-in.', 'success');
+            if (data.detected && data.aruco_id) {
+                updateStatus(`ArUco code ${data.aruco_id} detected! Ready for check-in.`, 'success');
                 updateCheckInButton(true);
-                currentArucoId = 'ARUCO-001'; // In a real system, this would be the actual detected ID
+                currentArucoId = data.aruco_id;
             } else {
                 updateStatus('Position ArUco code in the center box...', 'info');
                 updateCheckInButton(false);
@@ -43,12 +43,12 @@ function checkAruco() {
 
 document.getElementById('checkinBtn').addEventListener('click', () => {
     if (!currentArucoId) return;
-    
+
     fetch(`/checkin/${currentArucoId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                updateStatus('Check-in successful!', 'success');
+                updateStatus(`Check-in successful for ArUco ${currentArucoId}!`, 'success');
                 updateHistory();
                 setTimeout(() => {
                     updateStatus('Position ArUco code in the center box...', 'info');

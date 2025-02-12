@@ -15,30 +15,41 @@ class ArucoProcessor:
 
         # Draw center box
         height, width = frame.shape[:2]
-        box_size = min(width, height) // 3
+        box_size = min(width, height) // 2  # Increased box size to half of min dimension
         center_x = width // 2
         center_y = height // 2
 
-        # Draw green box in center
+        # Detect ArUco markers
+        corners, ids, _ = self.detector.detectMarkers(frame)
+
+        # Check if marker is in center box
+        aruco_detected = False
+        detected_id = None
+        if len(corners) > 0:
+            for i, corner in enumerate(corners):
+                marker_center = np.mean(corner[0], axis=0)
+                if (abs(marker_center[0] - center_x) < box_size//2 and
+                    abs(marker_center[1] - center_y) < box_size//2):
+                    aruco_detected = True
+                    detected_id = str(ids[i][0])  # Convert ID to string
+                    break
+
+        # Draw box with color based on detection
+        color = (0, 255, 0) if aruco_detected else (0, 0, 255)  # Green if detected, red if not
         cv2.rectangle(frame,
                      (center_x - box_size//2, center_y - box_size//2),
                      (center_x + box_size//2, center_y + box_size//2),
-                     (0, 255, 0), 2)
+                     color, 2)
 
-        # Detect ArUco markers
-        corners, ids, _ = self.detector.detectMarkers(frame)
-
-        aruco_detected = False
         if len(corners) > 0:
             cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-            aruco_detected = True
 
         ret, jpeg = cv2.imencode('.jpg', frame)
-        return jpeg.tobytes(), aruco_detected
+        return jpeg.tobytes(), detected_id
 
     def check_aruco_in_center(self, frame):
         height, width = frame.shape[:2]
-        box_size = min(width, height) // 3
+        box_size = min(width, height) // 2  # Match the larger box size
         center_x = width // 2
         center_y = height // 2
 
@@ -46,13 +57,9 @@ class ArucoProcessor:
         corners, ids, _ = self.detector.detectMarkers(frame)
 
         if len(corners) > 0:
-            for corner in corners:
-                # Calculate marker center
+            for i, corner in enumerate(corners):
                 marker_center = np.mean(corner[0], axis=0)
-
-                # Check if marker is in center box
                 if (abs(marker_center[0] - center_x) < box_size//2 and
                     abs(marker_center[1] - center_y) < box_size//2):
-                    return True
-
-        return False
+                    return str(ids[i][0])  # Return actual ArUco ID as string
+        return None
