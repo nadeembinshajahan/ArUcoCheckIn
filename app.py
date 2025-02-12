@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from flask import Flask, render_template, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -49,15 +50,32 @@ def create_app():
 
     @app.route('/video_feed')
     def video_feed():
-        return Response(gen_frames(),
+        def generate():
+            while True:
+                try:
+                    frame = camera.get_frame()
+                    if frame is not None:
+                        processed_frame, aruco_detected = processor.process_frame(frame)
+                        if processed_frame is not None:
+                            yield (b'--frame\r\n'
+                                   b'Content-Type: image/jpeg\r\n\r\n' + processed_frame + b'\r\n')
+                except Exception as e:
+                    logging.error(f"Error in video feed: {str(e)}")
+                    # Small delay to prevent rapid reconnection attempts
+                    time.sleep(0.1)
+
+        return Response(generate(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
 
     @app.route('/check_aruco')
     def check_aruco():
-        frame = camera.get_frame(raw=True)
-        if frame is not None:
-            is_detected = processor.check_aruco_in_center(frame)
-            return jsonify({'detected': is_detected})
+        try:
+            frame = camera.get_frame(raw=True)
+            if frame is not None:
+                is_detected = processor.check_aruco_in_center(frame)
+                return jsonify({'detected': is_detected})
+        except Exception as e:
+            logging.error(f"Error checking ArUco: {str(e)}")
         return jsonify({'detected': False})
 
     @app.route('/checkin/<aruco_id>')

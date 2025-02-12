@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import logging
 import os
+from threading import Lock
 
 class Camera:
     def __init__(self, video_source=0):
@@ -19,6 +20,7 @@ class Camera:
         self.video = None
         self.test_pattern = None
         self.video_source = video_source
+        self.lock = Lock()  # Add thread synchronization
 
         try:
             if isinstance(video_source, str) and os.path.isfile(video_source):
@@ -45,8 +47,13 @@ class Camera:
                        2)
 
     def __del__(self):
+        self.release()
+
+    def release(self):
+        """Safely release video resources"""
         if self.video is not None:
             self.video.release()
+            self.video = None
 
     def get_frame(self, raw=False):
         """
@@ -64,19 +71,26 @@ class Camera:
         - Continuously captures frames
         - Falls back to test pattern if camera becomes unavailable
         """
-        if self.video is not None:
-            success, frame = self.video.read()
-            if not success:
-                # For video files, loop back to start
-                if isinstance(self.video_source, str):
-                    self.video.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        frame = None
+        with self.lock:  # Ensure thread-safe access to video device
+            try:
+                if self.video is not None:
                     success, frame = self.video.read()
                     if not success:
-                        frame = self.test_pattern.copy() if self.test_pattern is not None else None
+                        # For video files, loop back to start
+                        if isinstance(self.video_source, str):
+                            self.video.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                            success, frame = self.video.read()
+                            if not success:
+                                frame = self.test_pattern.copy() if self.test_pattern is not None else None
+                        else:
+                            frame = self.test_pattern.copy() if self.test_pattern is not None else None
                 else:
                     frame = self.test_pattern.copy() if self.test_pattern is not None else None
-        else:
-            frame = self.test_pattern.copy() if self.test_pattern is not None else None
+
+            except Exception as e:
+                logging.error(f"Error reading frame: {str(e)}")
+                frame = self.test_pattern.copy() if self.test_pattern is not None else None
 
         if frame is None:
             return None
@@ -84,5 +98,9 @@ class Camera:
         if raw:
             return frame
 
-        ret, jpeg = cv2.imencode('.jpg', frame)
-        return jpeg.tobytes()
+        try:
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            return jpeg.tobytes() if ret else None
+        except Exception as e:
+            logging.error(f"Error encoding frame: {str(e)}")
+            return None
