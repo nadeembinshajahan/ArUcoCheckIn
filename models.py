@@ -16,7 +16,7 @@ class CheckIn(db.Model):
         if not self.check_out_time:
             return False
         time_diff = datetime.utcnow() - self.check_out_time
-        return time_diff.total_seconds() >= 10
+        return time_diff.total_seconds() >= 10  # 10-second cooldown
 
     @classmethod
     def get_latest_by_aruco(cls, aruco_id):
