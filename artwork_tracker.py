@@ -28,18 +28,18 @@ class ArtworkTracker:
         """
         self.camera_id = camera_id
         self.artwork_id = artwork_id
-        self.server_url = server_url
-        
+        self.server_url = server_url.rstrip('/')  # Remove trailing slash if present
+
         # Initialize ArUco detector
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
         self.parameters = cv2.aruco.DetectorParameters()
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.parameters)
-        
+
         # Tracking state
         self.marker_section_times: Dict[int, Dict[int, float]] = {}  # marker_id -> section -> time
         self.marker_last_times: Dict[int, float] = {}  # marker_id -> last_seen_time
         self.marker_current_sections: Dict[int, int] = {}  # marker_id -> current_section
-        
+
         # Configure logging
         logging.basicConfig(
             level=logging.INFO,
@@ -98,10 +98,12 @@ class ArtworkTracker:
                 'camera_id': self.camera_id,
                 'artwork_id': self.artwork_id,
                 'aruco_id': marker_id,
-                'event': 'observation_start',
+                'event_type': 'start',
                 'timestamp': datetime.utcnow().isoformat()
             }
-            requests.post(f"{self.server_url}/observation/start", json=data)
+            response = requests.post(f"{self.server_url}/observation/start", json=data)
+            if not response.ok:
+                logging.error(f"Failed to report observation start: {response.text}")
         except Exception as e:
             logging.error(f"Failed to report observation start: {str(e)}")
 
@@ -112,14 +114,6 @@ class ArtworkTracker:
             for marker_id, section_times in self.marker_section_times.items():
                 # Only report if we have actual time spent
                 if sum(section_times.values()) > 0:
-                    observation = ArtworkObservation(
-                        artwork_id=self.artwork_id,
-                        aruco_id=marker_id,
-                        start_time=self.marker_last_times[marker_id],
-                        end_time=current_time,
-                        section_times=section_times.copy()
-                    )
-                    
                     data = {
                         'camera_id': self.camera_id,
                         'artwork_id': self.artwork_id,
@@ -128,11 +122,13 @@ class ArtworkTracker:
                         'total_time': sum(section_times.values()),
                         'timestamp': datetime.utcnow().isoformat()
                     }
-                    
-                    requests.post(f"{self.server_url}/observation/update", json=data)
-                    
-                    # Reset times after reporting
-                    self.marker_section_times[marker_id] = {1: 0, 2: 0, 3: 0}
-                    
+
+                    response = requests.post(f"{self.server_url}/observation/update", json=data)
+                    if not response.ok:
+                        logging.error(f"Failed to report section times: {response.text}")
+                    else:
+                        # Reset times after successful reporting
+                        self.marker_section_times[marker_id] = {1: 0, 2: 0, 3: 0}
+
         except Exception as e:
             logging.error(f"Failed to report section times: {str(e)}")

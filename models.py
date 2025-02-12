@@ -37,14 +37,14 @@ class ArtworkObservation(db.Model):
     __tablename__ = 'artwork_observations'
 
     id = db.Column(db.Integer, primary_key=True)
-    camera_id = db.Column(db.String(50), nullable=False)  # Identifies which RPI camera
-    artwork_id = db.Column(db.String(50), nullable=False)  # Identifies the artwork being observed
-    aruco_id = db.Column(db.Integer, nullable=False)      # Visitor identifier
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # Changed from start_time to timestamp
-    section_1_time = db.Column(db.Float, default=0.0)    # Time spent in section 1
-    section_2_time = db.Column(db.Float, default=0.0)    # Time spent in section 2
-    section_3_time = db.Column(db.Float, default=0.0)    # Time spent in section 3
-    total_time = db.Column(db.Float, default=0.0)        # Total observation time
+    camera_id = db.Column(db.String(50), nullable=False)
+    artwork_id = db.Column(db.String(50), nullable=False)
+    aruco_id = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    section_1_time = db.Column(db.Float, default=0.0)
+    section_2_time = db.Column(db.Float, default=0.0)
+    section_3_time = db.Column(db.Float, default=0.0)
+    total_time = db.Column(db.Float, default=0.0)
 
     @property
     def section_times(self):
@@ -57,10 +57,10 @@ class ArtworkObservation(db.Model):
 class Camera(db.Model):
     __tablename__ = 'cameras'
 
-    camera_id = db.Column(db.String(50), primary_key=True)  # Changed from 'id' to 'camera_id'
-    location = db.Column(db.String(100))                    # Physical location in gallery
-    artwork_ids = db.Column(db.String(500))                # JSON string of artwork IDs being monitored
-    last_active = db.Column(db.DateTime)                   # Last heartbeat time
+    camera_id = db.Column(db.String(50), primary_key=True)
+    location = db.Column(db.String(100))
+    artwork_ids = db.Column(db.String(500))  # JSON string of artwork IDs being monitored
+    last_active = db.Column(db.DateTime)
 
     @property
     def monitored_artworks(self):
