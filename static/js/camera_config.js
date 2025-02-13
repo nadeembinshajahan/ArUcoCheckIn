@@ -8,6 +8,13 @@ let startX, startY;
 let regions = [];  // Store box regions
 let streamUrl = null;
 
+// Generate a unique color for each region
+function generateUniqueColor() {
+    // Generate vibrant colors using HSL
+    const hue = (regions.length * 137.508) % 360; // Golden angle approximation
+    return `hsl(${hue}, 70%, 50%)`;
+}
+
 // Set canvas size
 function setCanvasSize() {
     const containerWidth = document.querySelector('.canvas-container').offsetWidth;
@@ -47,7 +54,7 @@ drawCanvas.addEventListener('mousemove', function(e) {
     redrawRegions();
 
     // Draw current box
-    drawBox(startX, startY, currentX - startX, currentY - startY);
+    drawBox(startX, startY, currentX - startX, currentY - startY, '#00ff00');
 });
 
 drawCanvas.addEventListener('mouseup', function(e) {
@@ -57,24 +64,25 @@ drawCanvas.addEventListener('mouseup', function(e) {
     const endX = e.clientX - rect.left;
     const endY = e.clientY - rect.top;
 
-    // Add new region
+    // Add new region with unique color
     regions.push({
         id: Date.now(),
         name: `Region ${regions.length + 1}`,
         x: Math.min(startX, endX),
         y: Math.min(startY, endY),
         width: Math.abs(endX - startX),
-        height: Math.abs(endY - startY)
+        height: Math.abs(endY - startY),
+        color: generateUniqueColor()
     });
 
     isDrawing = false;
     updateRegionsTable();
 });
 
-function drawBox(x, y, width, height) {
+function drawBox(x, y, width, height, color) {
     drawCtx.beginPath();
     drawCtx.rect(x, y, width, height);
-    drawCtx.strokeStyle = '#00ff00';
+    drawCtx.strokeStyle = color;
     drawCtx.lineWidth = 2;
     drawCtx.stroke();
 }
@@ -82,7 +90,7 @@ function drawBox(x, y, width, height) {
 function redrawRegions() {
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
     regions.forEach(region => {
-        drawBox(region.x, region.y, region.width, region.height);
+        drawBox(region.x, region.y, region.width, region.height, region.color);
     });
 }
 
@@ -92,8 +100,11 @@ function updateRegionsTable() {
         <tr>
             <td>${region.id}</td>
             <td>
-                <input type="text" class="form-control" value="${region.name}"
-                    onchange="updateRegionName('${region.id}', this.value)">
+                <div class="d-flex align-items-center">
+                    <div style="width: 20px; height: 20px; background-color: ${region.color}; margin-right: 10px; border: 1px solid #666;"></div>
+                    <input type="text" class="form-control" value="${region.name}"
+                        onchange="updateRegionName('${region.id}', this.value)">
+                </div>
             </td>
             <td>X: ${Math.round(region.x)}, Y: ${Math.round(region.y)}, 
                 W: ${Math.round(region.width)}, H: ${Math.round(region.height)}</td>
