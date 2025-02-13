@@ -16,5 +16,4 @@ dependencies = [
     "requests>=2.32.3",
     "sqlalchemy>=2.0.38",
     "flask-wtf>=1.2.2",
-    "twilio>=9.4.5",
 ]

@@ -1,126 +1,64 @@
-pip install flask flask-sqlalchemy opencv-python-headless numpy psycopg2-binary requests
+pip install flask flask-sqlalchemy opencv-python-headless numpy
 ```
 
 ## Configuration
 
 The application can be configured using environment variables:
 
-- `DATABASE_URL`: PostgreSQL database connection string
 - `VIDEO_SOURCE`: Path to video file or camera index (default: 'attached_assets/check.MOV')
 - `FLASK_SECRET_KEY`: Secret key for Flask sessions (default: 'dev_key_123')
 
-## Setup Instructions
+## Running the Application
 
-1. Install Dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-2. Set up the database:
-```bash
-# The database URL should be in the environment variable DATABASE_URL
-```
-
-3. Start the Flask server:
+1. Start the Flask server:
 ```bash
 python main.py
 ```
 
-4. Access the application:
+2. Open your web browser and navigate to:
 ```
 http://localhost:5000
 ```
 
-## Usage Guide
+## Usage
 
-### Camera Configuration
+1. Main Interface Features:
+   - Live video feed showing ArUco marker detection
+   - Center detection zone (red when empty, green when marker detected)
+   - Dynamic check-in/checkout button
+   - Real-time history panel
 
-1. Navigate to `/camera_config` in your browser
-2. Enter the camera URL/source
-3. Use the drawing tools to define artwork regions:
-   - Click on the video feed to create vertical region boundaries
-   - Red lines indicate frame edges
-   - Green lines indicate user-defined boundaries
-   - Each region between lines represents an artwork area
-4. Name your regions using the table below the video feed
-5. Save your configuration
+2. Check-in Process:
+   - Position an ArUco marker in the center zone
+   - Wait for the zone to turn green (marker detected)
+   - Click the "Check In" button when enabled
+   - The system records the check-in time
 
-### Analytics Dashboard
+3. Checkout Process:
+   - If a checked-in marker is detected again, a "Check Out" button appears
+   - Click to record the checkout time
+   - After checkout, there's a 10-second cooldown before the same code can check in again
 
-1. Navigate to `/dashboard` to view:
-   - Total visitor count
-   - Active cameras
-   - Average observation time
-   - Most viewed artwork
-   - Time spent per section
-   - Visitor flow throughout the day
-   - Recent observations table
+4. History Panel:
+   - Shows the most recent check-ins and checkouts
+   - Displays ArUco code IDs, check-in times, and checkout times
+   - Updates in real-time as actions occur
 
-### ArUco Tracking
+## ArUco Markers
 
-The system uses 6x6 ArUco markers (DICT_6X6_50) for visitor tracking:
-- Each visitor receives a unique ArUco marker
-- Markers are detected in real-time by cameras
-- Section times are calculated based on marker position
-- Data is sent to the central server for analytics
+This system uses 6x6 ArUco markers (DICT_6X6_50). You can generate these markers using:
+- OpenCV's aruco.Dictionary_create() function
+- Online ArUco marker generators
+- Pre-generated marker sets (available in OpenCV)
 
 ## Project Structure
 ```
 .
 ├── app.py              # Main Flask application
-├── artwork_tracker.py  # ArUco tracking and observation logic
-├── models.py          # Database models
+├── camera.py           # Camera/video handling
+├── aruco_processor.py  # ArUco detection logic
+├── models.py           # Database models
 ├── static/            
-│   ├── css/          # Stylesheets
-│   └── js/           # JavaScript files
-│       ├── dashboard.js    # Dashboard visualization
-│       └── camera_config.js # Camera configuration interface
-└── templates/         # HTML templates
-    ├── dashboard.html     # Analytics dashboard
-    └── camera_config.html # Camera setup interface
-```
-
-## API Documentation
-
-### Observation Endpoints
-
-- `POST /observation/start`
-  - Start tracking a new visitor
-  - Body: `{camera_id, artwork_id, aruco_id, timestamp}`
-
-- `POST /observation/update`
-  - Update section times for a visitor
-  - Body: `{camera_id, artwork_id, aruco_id, section_times, total_time, timestamp}`
-
-### Camera Management
-
-- `POST /api/camera/register`
-  - Register a new camera in the system
-  - Body: `{camera_id, location, artwork_ids}`
-
-- `POST /api/connect_camera`
-  - Connect to a camera feed
-  - Body: `{camera_url}`
-
-- `POST /api/save_regions`
-  - Save artwork regions for a camera
-  - Body: `{camera_url, regions}`
-
-## Development
-
-For development purposes:
-- Debug mode is enabled
-- Flask runs on port 5000
-- Logging is set to DEBUG level
-- Database tables are automatically created on startup
-
-## Testing
-
-Run the integration tests:
-```bash
-python test_server_integration.py
-```
-
-Run the tracking tests:
-```bash
-python test_tracking.py
+│   ├── css/           # Stylesheets
+│   └── js/            # JavaScript files
+└── templates/          # HTML templates

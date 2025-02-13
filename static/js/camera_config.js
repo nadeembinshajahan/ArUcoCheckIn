@@ -15,17 +15,6 @@ function setCanvasSize() {
     videoCanvas.width = drawCanvas.width = containerWidth;
     videoCanvas.height = drawCanvas.height = height;
 
-    // Initialize edge lines if not already present
-    if (verticalLines.length === 0) {
-        verticalLines = [
-            { x: 0, name: 'Left Edge' },
-            { x: containerWidth, name: 'Right Edge' }
-        ];
-    } else {
-        // Update right edge position on resize
-        verticalLines[verticalLines.length - 1].x = containerWidth;
-    }
-
     // Redraw lines after resize
     redrawLines();
 }
@@ -41,43 +30,36 @@ drawCanvas.addEventListener('click', function(e) {
     const rect = drawCanvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
 
-    // Insert new line at the correct position
-    let insertIndex = 1; // Start after left edge
-    while (insertIndex < verticalLines.length && verticalLines[insertIndex].x < x) {
-        insertIndex++;
-    }
-
     // Add line to storage
-    verticalLines.splice(insertIndex, 0, {
+    verticalLines.push({
         x: x,
-        name: `Region ${insertIndex}`
+        name: `Region ${verticalLines.length + 1}`
     });
 
-    // Redraw all lines and update regions
-    redrawLines();
+    // Draw the line
+    drawVerticalLine(x);
     updateRegionsTable();
 });
 
-function drawVerticalLine(x, isEdge = false) {
+function drawVerticalLine(x) {
     drawCtx.beginPath();
     drawCtx.moveTo(x, 0);
     drawCtx.lineTo(x, drawCanvas.height);
-    drawCtx.strokeStyle = isEdge ? '#ff0000' : '#00ff00'; // Red for edges, green for user lines
-    drawCtx.lineWidth = isEdge ? 3 : 2;
+    drawCtx.strokeStyle = '#00ff00';
+    drawCtx.lineWidth = 2;
     drawCtx.stroke();
 }
 
 function redrawLines() {
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    verticalLines.forEach((line, index) => {
-        // Draw edges in red, other lines in green
-        drawVerticalLine(line.x, index === 0 || index === verticalLines.length - 1);
+    verticalLines.forEach(line => {
+        drawVerticalLine(line.x);
     });
 }
 
 function updateRegionsTable() {
     const tbody = document.getElementById('regionsTable');
-    // Create regions between consecutive lines
+    // Create regions from pairs of lines
     const regions = [];
     for (let i = 0; i < verticalLines.length - 1; i++) {
         regions.push({
@@ -97,27 +79,24 @@ function updateRegionsTable() {
             </td>
             <td>X: ${Math.round(region.start)} to ${Math.round(region.end)}</td>
             <td>
-                ${region.id === 1 || region.id === regions.length ? '' : 
-                    `<button class="btn btn-sm btn-danger" onclick="deleteRegion(${region.id})">Delete</button>`}
+                <button class="btn btn-sm btn-danger" onclick="deleteRegion(${region.id})">Delete</button>
             </td>
         </tr>
     `).join('');
 }
 
 function updateRegionName(id, newName) {
-    // Update the name of the right boundary line of the region
-    if (id > 0 && id < verticalLines.length) {
-        verticalLines[id].name = newName;
+    const region = verticalLines[id - 1];
+    if (region) {
+        region.name = newName;
     }
 }
 
 function deleteRegion(id) {
-    // Remove the line that separates this region (keep edges)
-    if (id > 1 && id < verticalLines.length - 1) {
-        verticalLines.splice(id, 1);
-        redrawLines();
-        updateRegionsTable();
-    }
+    // Remove the vertical lines that define this region
+    verticalLines.splice(id - 1, 2);
+    redrawLines();
+    updateRegionsTable();
 }
 
 // Button handlers
@@ -126,18 +105,14 @@ document.getElementById('startDrawing').addEventListener('click', function(e) {
 });
 
 document.getElementById('clearDrawing').addEventListener('click', function() {
-    // Reset to just edge lines
-    verticalLines = [
-        { x: 0, name: 'Left Edge' },
-        { x: drawCanvas.width, name: 'Right Edge' }
-    ];
-    redrawLines();
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    verticalLines = [];
     updateRegionsTable();
 });
 
 document.getElementById('saveRegions').addEventListener('click', async function() {
     try {
-        // Create regions from all lines
+        // Create regions from pairs of lines
         const regions = [];
         for (let i = 0; i < verticalLines.length - 1; i++) {
             regions.push({
